@@ -1,0 +1,30 @@
+[build-system]
+requires = ["setuptools>=68", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "multi-agent-system"
+version = "1.0.0"
+description = "Asynchronous multi-agent orchestration with schema-validated messaging and shared state"
+readme = "README.md"
+requires-python = ">=3.10"
+dependencies = [
+  "pydantic>=2.5.0",
+  "groq>=0.11.0",
+  "python-dotenv>=1.0.0",
+  "redis>=5.0.0",
+]
+
+[project.optional-dependencies]
+test = ["pytest>=8.0.0", "pytest-asyncio>=0.23.0"]
+
+[project.scripts]
+multi-agent = "multi_agent_system.cli:main"
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.pytest.ini_options]
+asyncio_mode = "auto"
+testpaths = ["tests"]
+addopts = "-q"

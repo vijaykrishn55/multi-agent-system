@@ -1,0 +1,98 @@
+Metadata-Version: 2.4
+Name: multi-agent-system
+Version: 1.0.0
+Summary: Asynchronous multi-agent orchestration with schema-validated messaging and shared state
+Requires-Python: >=3.10
+Description-Content-Type: text/markdown
+Requires-Dist: pydantic>=2.5.0
+Requires-Dist: groq>=0.11.0
+Requires-Dist: python-dotenv>=1.0.0
+Requires-Dist: redis>=5.0.0
+Provides-Extra: test
+Requires-Dist: pytest>=8.0.0; extra == "test"
+Requires-Dist: pytest-asyncio>=0.23.0; extra == "test"
+
+# Multi-Agent System
+
+An asynchronous multi-agent orchestration engine with a planner, Researcher and Summarizer agents, structured messages, shared workflow state, bounded queues, retries, and final synthesis.
+
+## Architecture
+
+- `MultiAgentEngine`: coordinates the workflow and enforces timeouts.
+- `WorkflowPlan`, `AgentReport`, and `FinalAnswer`: Pydantic models for validated agent inputs and outputs.
+- `AsyncMessageBus`: bounded `asyncio.Queue` instances for agent task delivery and backpressure.
+- `InMemoryStateStore`: lock-protected state with versioning and an event log.
+- `RedisStateStore`: optional Redis-backed state using optimistic concurrency with `WATCH` / `MULTI` / `EXEC`.
+- `GroqProvider`: async model calls using JSON Schema structured outputs.
+- `DeterministicProvider`: repeatable demo and test provider.
+
+Each workflow gets a compact plan. The Researcher and Summarizer receive separate assignments and run concurrently. Their validated reports are written to shared state and combined into a final response. Failed agent calls are retried within a configured limit; timeouts and failures are recorded, and the final result can be marked `partial` instead of losing successful work.
+
+## Setup
+
+Python 3.10 or newer is required.
+
+```powershell
+python -m venv .venv
+.\.venv\Scripts\Activate.ps1
+python -m pip install -r requirements.txt
+python -m pip install -e .
+```
+
+Create `.env` from `.env.example` and set `GROQ_API_KEY`. The default model is `openai/gpt-oss-20b`; change `GROQ_MODEL` if needed.
+
+## Run
+
+Run a workflow:
+
+```powershell
+python -m multi_agent_system.cli "Analyze electric vehicle market themes and summarize regulatory considerations."
+```
+
+Run a repeatable demo:
+
+```powershell
+python -m multi_agent_system.cli --mock "Explain how asynchronous message queues support multi-agent workflows."
+```
+
+Run the verification suite:
+
+```powershell
+python -m pytest -q
+python scripts/verify.py
+```
+
+The report is written to `reports/verification.json`.
+
+## Redis state backend
+
+The default state backend is in memory. To use Redis for shared workflow state, start Redis:
+
+```powershell
+docker compose up -d
+```
+
+Set these values in `.env`:
+
+```text
+STATE_BACKEND=redis
+REDIS_URL=redis://localhost:6379/0
+```
+
+The task queues in this implementation use bounded in-process `asyncio.Queue` instances. Redis is used by the optional state backend; the queue implementation can be replaced with Redis Streams when durable cross-process queue delivery is needed.
+
+## Configuration
+
+- `GROQ_API_KEY`: provider credential.
+- `GROQ_MODEL`: model identifier.
+- `STATE_BACKEND`: `memory` or `redis`.
+- `REDIS_URL`: Redis connection string.
+- `QUEUE_MAXSIZE`: per-agent queue capacity.
+- `AGENT_TIMEOUT_SECONDS`: timeout for each agent attempt.
+- `WORKFLOW_TIMEOUT_SECONDS`: deadline for plan and task collection.
+- `MAX_AGENT_RETRIES`: retries after an agent attempt fails.
+- `STRUCTURED_OUTPUT_RETRIES`: retries for invalid plans or final output.
+
+## Notes
+
+The Researcher operates on the user request and model knowledge; this project does not include a web-search connector. Add a source retrieval tool if a workflow requires current, externally verified information. The deterministic provider is for testing the orchestration mechanics; use the configured model provider for natural-language analysis.
